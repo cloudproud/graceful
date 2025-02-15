@@ -12,7 +12,7 @@ import (
 )
 
 func TestContextSignal(t *testing.T) {
-	ctx := NewContext(context.Background(), zaptest.NewLogger(t))
+	ctx := NewContext(context.Background(), WithLogger(zaptest.NewLogger(t)))
 
 	mu := sync.Mutex{}
 	expected := 3
@@ -43,7 +43,7 @@ func TestContextSignal(t *testing.T) {
 }
 
 func TestForceContextSignal(t *testing.T) {
-	ctx := NewContext(context.Background(), zaptest.NewLogger(t))
+	ctx := NewContext(context.Background(), WithLogger(zaptest.NewLogger(t)))
 
 	mu := sync.Mutex{}
 	expected := 0

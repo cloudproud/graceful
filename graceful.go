@@ -10,18 +10,33 @@ import (
 	"go.uber.org/zap"
 )
 
+type Option func(*ctx)
+
+// WithLogger sets the logger for the graceful context.
+func WithLogger(logger *zap.Logger) Option {
+	return func(ctx *ctx) {
+		ctx.logger = logger
+	}
+}
+
 // NewContext constructs a new graceful context. The returned contexts embeds
 // the context.Context interface and exposes additional methods which could be
 // used to gracefully shutdown components and connections before exiting the application.
-func NewContext(bg context.Context, logger *zap.Logger) Context {
+func NewContext(bg context.Context, options ...Option) Context {
 	bg, cancel := context.WithCancel(bg)
 
-	return &ctx{
-		logger:  logger,
+	graceful := &ctx{
+		logger:  zap.L(),
 		Context: bg,
 		cancel:  cancel,
 		sigChan: make(chan os.Signal, 1), // Separate signal channel for each context
 	}
+
+	for _, option := range options {
+		option(graceful)
+	}
+
+	return graceful
 }
 
 type Context interface {
