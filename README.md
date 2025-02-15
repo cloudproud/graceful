@@ -23,7 +23,7 @@ func main() {
 
     var err error
     if err != nil {
-        ctx.Shutdown() // shutdown application on
+        ctx.Shutdown() // initiates a graceful shutdown of the application due to a critical error
     }
 
     ctx.AwaitKillSignal()
