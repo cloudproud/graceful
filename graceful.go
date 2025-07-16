@@ -78,9 +78,11 @@ func (ctx *ctx) Shutdown() {
 	go func() {
 		defer close(closer)
 
+		ctx.mu.Lock()
 		for i := len(ctx.closers) - 1; i >= 0; i-- {
 			ctx.closers[i]()
 		}
+		ctx.mu.Unlock()
 	}()
 
 	// waits on either the context's specific signal channel or the closer channel.
