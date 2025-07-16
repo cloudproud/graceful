@@ -29,6 +29,7 @@ func NewContext(bg context.Context, options ...Option) Context {
 		logger:  zap.L(),
 		Context: bg,
 		cancel:  cancel,
+		closers: make([]func(), 0),
 		sigChan: make(chan os.Signal, 1), // Separate signal channel for each context
 	}
 
@@ -54,7 +55,7 @@ type Context interface {
 type ctx struct {
 	context.Context
 	mu      sync.Mutex
-	wg      sync.WaitGroup
+	closers []func()
 	cancel  context.CancelFunc
 	logger  *zap.Logger
 	sigChan chan os.Signal // Separate signal channel for each context
@@ -64,11 +65,8 @@ type ctx struct {
 // blocking on (ctx.wg) by incrementing for each closer till the closer finished closing.
 func (ctx *ctx) Closer(fn func()) {
 	ctx.mu.Lock()
-	ctx.wg.Add(1)
+	ctx.closers = append(ctx.closers, fn)
 	ctx.mu.Unlock()
-	defer ctx.wg.Done()
-	<-ctx.Done()
-	fn()
 }
 
 // cancel triggers Done channel to close, releasing any goroutines/operations waiting on channel.
@@ -79,9 +77,10 @@ func (ctx *ctx) Shutdown() {
 	closer := make(chan struct{})
 	go func() {
 		defer close(closer)
-		ctx.mu.Lock()
-		ctx.wg.Wait()
-		ctx.mu.Unlock()
+
+		for i := len(ctx.closers) - 1; i >= 0; i-- {
+			ctx.closers[i]()
+		}
 	}()
 
 	// waits on either the context's specific signal channel or the closer channel.
