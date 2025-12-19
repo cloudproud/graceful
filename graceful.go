@@ -59,6 +59,7 @@ type ctx struct {
 	cancel  context.CancelFunc
 	logger  *zap.Logger
 	sigChan chan os.Signal // Separate signal channel for each context
+	wg      sync.WaitGroup
 }
 
 // goroutine is spawned to wait for all registered closers to finish their operations.
@@ -75,7 +76,10 @@ func (ctx *ctx) Shutdown() {
 	ctx.logger.Info("graceful shutdown, press Ctrl_C to force quit")
 
 	closer := make(chan struct{})
+	ctx.wg.Add(1)
+
 	go func() {
+		defer ctx.wg.Done()
 		defer close(closer)
 
 		ctx.mu.Lock()
@@ -90,16 +94,21 @@ func (ctx *ctx) Shutdown() {
 	// or, if all closers have finished, it exits gracefully.
 	force := make(chan os.Signal, 1)
 	signal.Notify(force, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	defer signal.Stop(force)
 
 	select {
 	case <-force:
 		ctx.logger.Info("force quitting")
+		return
 	case <-ctx.sigChan: // Wait for the specific context's signal channel to exit
 		if ctx.logger != nil {
 			ctx.logger.Info("signal quitting")
 		}
+		return
 	case <-closer:
 	}
+
+	ctx.wg.Wait()
 }
 
 // AwaitKillSignal blocks current process till interrupt signal is received
